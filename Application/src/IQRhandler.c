@@ -30,6 +30,8 @@
 #include "seize_sky.h"
 #include "holding_jaw.h"
 
+static uint8_t Func_cnt = 0;
+
 __RAM_D2_ ALIGN_32B uint8_t UART1_RxBuffer[UART_RX_BUFFER_SIZE] = {0};
 __RAM_D2_ ALIGN_32B uint8_t UART3_RxBuffer[UART_RX_BUFFER_SIZE] = {0};
 __RAM_D2_ ALIGN_32B uint8_t UART4_RxBuffer[UART_RX_BUFFER_SIZE] = {0};
@@ -45,6 +47,14 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
            CAN1 留给用户通信,通用出队;ZDrive 所在总线由 ZdriveDequeue
            出队(命名归驱动所有)。拆分关闭时 CAN3 出队是空操作(队列可能
            承载 DJI/其他);ZDrive 若配在 CAN1,需注意此处会双重出队。 */
+
+        
+
+         Arm_State_Update();
+
+
+
+
         CAN_DequeueTx(&CAN1_Txqueue);
 #if USE_ZMDR
         ZdriveDequeue((uint8_t)MOTOR_ZDRIVE_CAN_BUS_1);
@@ -56,19 +66,16 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
         /* 1000Hz:接收不再经过软件队列 —— 各电机反馈帧已在 FDCAN
            接收中断里直接解析(见 HAL_FDCAN_RxFifo0/1Callback) */
-#if USE_DJ
-        DJmotor_Func();
-#endif
-        /*天空块状态机*/
-        Sky_Func();
-        /*夹爪开闭*/
-        Jaw_Func();
+
+        
 #if USE_UNITREE
         UnitreeMotor_Func();
 #endif
         /* 200Hz:func 更新,counter 分频(1kHz ÷ 5)。
            DJI 电机若需要 1kHz 电流环,把 DJmotor_Func() 挪到上面的 1kHz 区即可 */
-        static uint8_t Func_cnt = 0;
+#if USE_DJ
+        DJmotor_Func();
+#endif       
         if (++Func_cnt >= 5)
         {
             Func_cnt = 0;
@@ -78,6 +85,9 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #if USE_ZMDR
             ZdriveFunc();
 #endif
+
+
+
         }
     }
     /* TIM3/4/5 是备用定时器,需要的话在这里加分支,并在 main.c 里启动 */
@@ -99,8 +109,16 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
         if (hfdcan == &hfdcan1)
         {
-            Sky_Receive(Rxheader, Rx_data);
-            Jaw_Receive(Rxheader, Rx_data);
+           
+
+
+
+
+            Arm_Receive(Rxheader,Rx_data);
+
+
+
+
 #if USE_ZMDR
             ZdriveReceive(Rxheader, Rx_data, 0U);
 #endif
@@ -171,14 +189,14 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 /* UART 空闲中断:Size 字节可用,处理完重新启动 DMA 接收 */
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-    if (huart->Instance == USART1)
-    {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)UART1_RxBuffer, Size);
-        /* 在这里加 USART1 的协议处理 */
-        HAL_UART_DMAStop(&huart1);
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_RxBuffer, UART_RX_BUFFER_SIZE);
-    }
-    else if (huart->Instance == USART3)
+    // if (huart->Instance == USART1)
+    // {
+    //     SCB_InvalidateDCache_by_Addr((uint32_t *)UART1_RxBuffer, Size);
+    //     /* 在这里加 USART1 的协议处理 */
+    //     HAL_UART_DMAStop(&huart1);
+    //     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_RxBuffer, UART_RX_BUFFER_SIZE);
+    // }
+     if (huart->Instance == USART3)
     {
         SCB_InvalidateDCache_by_Addr((uint32_t *)UART3_RxBuffer, Size);
         /* 在这里加 USART3 的协议处理 */
@@ -226,9 +244,9 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_FEF);
     }
 
-    if (huart->Instance == USART1)
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_RxBuffer, UART_RX_BUFFER_SIZE);
-    else if (huart->Instance == USART3)
+    // if (huart->Instance == USART1)
+    //     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_RxBuffer, UART_RX_BUFFER_SIZE);
+    if (huart->Instance == USART3)
         HAL_UARTEx_ReceiveToIdle_DMA(&huart3, UART3_RxBuffer, UART_RX_BUFFER_SIZE);
     else if (huart->Instance == UART4)
         HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuffer, UART_RX_BUFFER_SIZE);

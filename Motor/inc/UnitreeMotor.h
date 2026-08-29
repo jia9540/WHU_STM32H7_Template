@@ -18,6 +18,7 @@
 #include "main.h"
 #include "motor_config.h"
 #include "crc_ccitt.h"
+#include "includes.h"
 
 #ifdef __cplusplus
 extern "C"

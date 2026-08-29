@@ -1,194 +1,670 @@
 #include "seize_sky.h"
 
-#define UnitreeMotor_Use_ID 1
-#define ZdriveMotor_Use_ID 1
-/*
-SKY_MODE_FDCANID为Sky模式切换的fdCANid，DLC为2，data[0]取值范围为0-3
-    Sky_Grab_Mode=0
-    Sky_Put_Mode=1
-    Sky_Carry_Mode=2
+#include "DJmotor.h"
 
-    */
+#define ARM_INTERPOLATION_DT    0.002f     
+#define ARM_EPSILON             0.0001f
+#define ARM_MOVE_TIME           3.0f
 
-#define JOINTAK_REDUCTION_RATIO 1
 
-#define SKY_ENABLE 0x01010401
-#define SKY_GRAB_FDCANID 0x01010402
-#define SKY_PUT_FDCANID 0x01010403
-#define SKY_ARM_RESET_FDCANID 0x01010404
+volatile uint8_t level_flag=0;
+volatile uint8_t Is_pick=0;
+volatile uint8_t Is_place=0;
+volatile uint8_t Is_store=0;
+volatile uint8_t Is_ready=0;
+volatile uint8_t Is_reset=0;
+ArmControl_t ArmControl;
 
-#define SKY_ALARM_FDCANID 0x010104EE
-#define SKY_RESET_FDCANID 0x010104FF
 
-#define JOINTGO_GRAB_POSITION 1
-#define JOINTAK_GRAB_POSITION 1
 
-#define JOINTGO_PUT_POSITION 2
-#define JOINTAK_PUT_POSITION 1
 
-#define JOINTGO_CARRY_POSITION 10
-#define JOINTAK_CARRY_POSITION 0.3
-
-#define JOINTGO_FINISH_THRESHOLD 0.5
-#define JOINTAK_FINISH_THRESHOLD 0.01
-
-#define GO_TIME 5000 // 单位为ms
-
-Sky_t sky;
-
-void Sky_Func(void)
+void Relay_ON(void)
 {
-    static float time;
-    float go_target_position;
-    if (sky.ResetFlag == true)
+    HAL_GPIO_WritePin(GPIOA,GPIO_PIN_9,GPIO_PIN_SET);
+}
+
+void Relay_OFF(void)
+{
+    HAL_GPIO_WritePin(GPIOA,GPIO_PIN_9,GPIO_PIN_RESET);
+}
+
+
+
+//时间归一化,计算轨迹设定角度
+static float Target_Quintic_Interpolation(float start_angle,float target,float time,float total_time)
+{
+    float t;
+    float t2;
+    float t3;
+    float t4;
+    float t5;
+    float s;
+    if (total_time<=0)
     {
-        __set_FAULTMASK(1); // 关闭所有的中断，确保执行复位时不被中断打断
-        NVIC_SystemReset(); // 系统软件复位，配置好的外设寄存器也一起复位
+        return target;
     }
-    if (sky.enable != true)
+
+    t=time/total_time;
+
+    if(t<=0.0f)
     {
-        return;
+        t=0.0f;
     }
-    switch (sky.Sky_Mode)
+    else if(t>=1.0f)
     {
-
-    case Sky_Grab_Mode:
-        go_target_position = JOINTGO_GRAB_POSITION;
-        if (sky.FinishFlag == 0)
-        {
-            time = Quintic_Traj(sky.Go_time++, GO_TIME);                                                                      // 轨迹规划，防止GO电机瞬间输出力矩过大
-            sky.JointGo->cmd.position = (JOINTGO_GRAB_POSITION - sky.JointGo_lastposition) * time + sky.JointGo_lastposition; // GO电机平滑从当前位置运动到指定位置
-            sky.JointAK->valSetNow.pos_deg = JOINTAK_GRAB_POSITION;
-            if (fabs(sky.JointGo->data.position - JOINTGO_GRAB_POSITION) < JOINTGO_FINISH_THRESHOLD &&
-                (fabs(sky.JointAK->valSetNow.pos_deg - sky.JointAK->valReal.pos_deg) < JOINTAK_FINISH_THRESHOLD) && sky.Go_time >= GO_TIME && sky.JointAK->valReal.speed_rpm <= 0.001 && sky.JointGo->data.speed <= 0.001)
-            {
-                sky.FinishFlag = 1;
-                sky.Go_time = 0;
-                sky.JointGo_lastposition = sky.JointGo->data.position;
-            }
-        }
-
-        break;
-
-    case Sky_Put_Mode:
-        go_target_position = JOINTGO_PUT_POSITION;
-        if (sky.FinishFlag == 0)
-        {
-            time = Quintic_Traj(sky.Go_time++, GO_TIME);
-            sky.JointGo->cmd.position = (JOINTGO_PUT_POSITION - sky.JointGo_lastposition) * time + sky.JointGo_lastposition;
-            sky.JointAK->valSetNow.pos_deg = JOINTAK_PUT_POSITION;
-            if (fabs(sky.JointGo->data.position - JOINTAK_PUT_POSITION) < JOINTGO_FINISH_THRESHOLD &&
-                fabs(sky.JointAK->valSetNow.pos_deg - sky.JointAK->valReal.pos_deg) < JOINTAK_FINISH_THRESHOLD && sky.Go_time >= GO_TIME && sky.JointAK->valReal.speed_rpm <= 0.001 && sky.JointGo->data.speed <= 0.001)
-            {
-                sky.FinishFlag = 1;
-                sky.Go_time = 0;
-                sky.JointGo_lastposition = sky.JointGo->data.position;
-            }
-        }
-        break;
-
-    case Sky_Carry_Mode:
-        go_target_position = JOINTGO_CARRY_POSITION;
-        if (sky.FinishFlag == 0)
-        {
-            time = Quintic_Traj(sky.Go_time++, GO_TIME);
-            sky.JointGo->cmd.position = (JOINTGO_CARRY_POSITION - sky.JointGo_lastposition) * time;
-            sky.JointAK->valSetNow.pos_deg = JOINTAK_CARRY_POSITION;
-        }
-        break;
-    default:
-        return;
+        t=1.0;
     }
-    if (fabs(sky.JointGo->data.position - go_target_position) < JOINTGO_FINISH_THRESHOLD &&
-        fabs(sky.JointAK->valSetNow.pos_deg - sky.JointAK->valReal.pos_deg) < JOINTAK_FINISH_THRESHOLD)
+
+
+    t2=t*t;
+    t3=t2*t;
+    t4=t3*t;
+    t5=t4*t;
+
+    s=10.0f*t5-15.0f*t4+6.0f*t3;
+
+    return start_angle+(target-start_angle)*s;
+
+}
+
+//开始轨迹计算
+static void Arm_Interpolation_Start(float u1_target,float u2_target, float dj_target, float move_time)
+{
+    ArmControl.u1.start_angle = Unitree_motors[0].data.position;
+    ArmControl.u2.start_angle = Unitree_motors[1].data.position;
+    ArmControl.dj.start_angle = DJmotor[0].valNow.angle_deg;
+
+    ArmControl.u1.target = u1_target;
+    ArmControl.u2.target = u2_target;
+    ArmControl.dj.target = dj_target;
+
+    ArmControl.time = 0.0f;
+    ArmControl.total_time = move_time;
+
+    ArmControl.running = true;
+    ArmControl.finish = false;
+
+}
+
+
+//轨迹点更新
+static void Arm_Interpolation_Update(void)
+{
+    if (ArmControl.running == false)
     {
-        sky.FinishFlag = 1;
-        sky.Go_time = 0;
-        sky.JointGo_lastposition = sky.JointGo->data.position;
+        return ;
+    }
+
+   
+
+    Unitree_motors[0].cmd.position =Target_Quintic_Interpolation(ArmControl.u1.start_angle,ArmControl.u1.target,ArmControl.time,ARM_MOVE_TIME);
+    Unitree_motors[1].cmd.position = Target_Quintic_Interpolation(ArmControl.u2.start_angle,ArmControl.u2.target,ArmControl.time,ARM_MOVE_TIME);
+    DJmotor[0].valSet.angle_deg =  Target_Quintic_Interpolation(ArmControl.dj.start_angle,ArmControl.dj.target,ArmControl.time,ARM_MOVE_TIME);
+
+    ArmControl.time += ARM_INTERPOLATION_DT;
+
+    if (ArmControl.time >= ARM_MOVE_TIME)
+    {
+        ArmControl.time = ARM_MOVE_TIME;
+        Unitree_motors[0].cmd.position = ArmControl.u1.target;
+        Unitree_motors[1].cmd.position = ArmControl.u2.target;
+        DJmotor[0].valSet.angle_deg = ArmControl.dj.target;
+        ArmControl.running = false;
+        ArmControl.finish = true;
+    }
+
+}
+
+
+
+//机械臂位置、模式初始化
+void Arm_Control_Init(void)
+{
+    ArmControl.state=ARM_STATE_NONE;
+    ArmControl.last_state=ARM_STATE_NONE;
+
+    ArmControl.time = 0.0f;
+    ArmControl.total_time = ARM_MOVE_TIME;
+
+    ArmControl.running = false;
+    ArmControl.finish = true;
+
+    ArmControl.u1.start_angle = 0.0f;
+    ArmControl.u1.target = ARM_U1_START_POS;
+
+    ArmControl.u2.start_angle = 0.0f;
+    ArmControl.u2.target = ARM_U2_START_POS;
+
+    ArmControl.dj.start_angle = 0.0f;
+    ArmControl.dj.target = ARM_DJ_START_POS;
+
+}
+
+
+
+// void Arm_Control_SetState(ArmState_t state)
+// {
+//     if (state < ARM_STATE_NONE || state > ARM_STATE_HIGH)
+//     {
+//         return;
+//     }
+//      ArmControl.state = state;
+// }
+
+
+// ArmState_t Arm_Control_GetState(void)
+// {
+//     return ArmControl.state;
+// }
+
+
+
+
+
+//其中一种状态，其他状态最后根据具体情况添加
+//准备状态
+static void Arm_Ready_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_READY_POS,ARM_U2_READY_POS,ARM_DJ_READY_POS,ARM_MOVE_TIME);
     }
 }
 
-void Sky_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_Data)
+//起始状态
+static void Arm_NONE_Process(void)
 {
-    FDCAN_TxHeaderTypeDef tx_message;
-    uint8_t tx_data[8];
-
-    tx_message.TxFrameType = FDCAN_DATA_FRAME;
-    tx_message.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-    tx_message.BitRateSwitch = FDCAN_BRS_OFF;
-    tx_message.FDFormat = FDCAN_CLASSIC_CAN;
-    tx_message.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-    tx_message.MessageMarker = 0;
-    tx_message.IdType = FDCAN_EXTENDED_ID;
-
-    if (Rxheader.RxFrameType != FDCAN_DATA_FRAME || Rxheader.DataLength < 1 || Rxheader.IdType != FDCAN_EXTENDED_ID)
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
     {
+        Arm_Interpolation_Start(ARM_U1_START_POS,ARM_U2_START_POS,ARM_DJ_START_POS,ARM_MOVE_TIME);
+    }
+}
+
+//底层取块
+static void Arm_LOW_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_LOW_POS,ARM_U2_LOW_POS,ARM_DJ_LOW_POS,ARM_MOVE_TIME);
+    }
+}
+
+//二层取块
+static void Arm_MID_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_MID_POS,ARM_U2_MID_POS,ARM_DJ_MID_POS,ARM_MOVE_TIME);
+    }
+}
+
+//取天空块
+static void Arm_SKY_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_SKY_POS,ARM_U2_SKY_POS,ARM_DJ_SKY_POS,ARM_MOVE_TIME);
+    }
+}
+
+//储存状态
+static void Arm_STORT_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_STORE_POS,ARM_U2_STORE_POS,ARM_DJ_STORE_POS,ARM_MOVE_TIME);
+    }
+}
+
+//底层放块
+static void Arm_LOW1_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_LOW1_POS,ARM_U2_LOW1_POS,ARM_DJ_LOW1_POS,ARM_MOVE_TIME);
+    }
+}
+
+//二层放块
+static void Arm_MID1_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_MID1_POS,ARM_U2_MID1_POS,ARM_DJ_MID1_POS,ARM_MOVE_TIME);
+    }
+}
+
+
+//三层放块
+static void Arm_HIGH_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_HIGH_POS,ARM_U2_HIGH_POS,ARM_DJ_HIGH_POS,ARM_MOVE_TIME);
+    }
+}
+
+
+//持块状态
+static void Arm_KEEP_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+        Arm_Interpolation_Start(ARM_U1_KEEP_POS,ARM_U2_KEEP_POS,ARM_DJ_KEEP_POS,ARM_MOVE_TIME);
+    }
+}
+
+
+
+
+
+void Arm_State_Update(void)
+{
+
+    if (Is_reset)
+    {
+        if (ArmControl.state!= ARM_STATE_NONE)
+        {
+            ArmControl.state = ARM_STATE_NONE;
+        }
+            Is_pick=0;
+            Is_place=0;
+            Is_store=0;
+            Is_reset=0;
+            Is_ready=0;
         return;
     }
 
-    if (Rxheader.Identifier == SKY_ENABLE && Rxheader.DataLength == 2 && Rx_Data[0] == 'M')
-    {
-        sky.enable = Rx_Data[1];
-        tx_message.Identifier = 0x04010101;
-        tx_message.DataLength = 2;
-        tx_data[0] = 'M';
-        tx_data[1] = sky.enable;
-        HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_message, tx_data);
-    }
-    if (Rxheader.Identifier == SKY_GRAB_FDCANID && Rxheader.DataLength == 2 && Rx_Data[0] == 'G' && Rx_Data[1] == 'S')
-    {
-        sky.Sky_Mode = Sky_Grab_Mode;
-        sky.FinishFlag = 0;
-    }
-    if (Rxheader.Identifier == SKY_PUT_FDCANID && Rxheader.DataLength == 2 && Rx_Data[0] == 'P' && Rx_Data[1] == 'S')
-    {
-        sky.Sky_Mode = Sky_Put_Mode;
-        sky.FinishFlag = 0;
-    }
-    if (Rxheader.Identifier == SKY_ARM_RESET_FDCANID && Rxheader.DataLength == 2 && Rx_Data[0] == 'A' && Rx_Data[1] == 'R')
-    {
-        sky.Sky_Mode = Sky_Carry_Mode;
-        sky.FinishFlag = 0;
-        /* code */
-    }
-    if (Rxheader.Identifier == SKY_RESET_FDCANID && Rxheader.DataLength == 2 && Rx_Data[0] == 'R' && Rx_Data[1] == 'S')
-    {
-        tx_message.Identifier = 0x040101FF;
-        tx_message.DataLength = 2;
-        tx_data[0] = 'R';
-        tx_data[1] = 'S';
-        HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_message, tx_data);
 
-        sky.ResetFlag = true;
-    }
-    if (Rxheader.Identifier == SKY_ALARM_FDCANID)
+
+    if (Is_ready)
     {
-        tx_message.Identifier = 0x040101EE;
-        tx_message.DataLength = 0;
-        HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_message, tx_data);
+        if (ArmControl.state != ARM_STATE_READY)
+        {
+            ArmControl.state = ARM_STATE_READY;
+ 
+        }
+            Is_pick=0;
+            Is_place=0;
+            Is_store=0;
+            Is_reset=0;
+            Is_ready=0;
+        return;
+    }
+
+
+
+    if (Is_store)
+    {
+        if (ArmControl.state != ARM_STATE_STORT)
+        {
+            ArmControl.state = ARM_STATE_STORT;
+        }
+        Is_pick=0;
+        Is_place=0;
+        Is_store=0;
+        Is_ready=0;
+        Is_reset=0;
+        return;
+    }
+
+
+    if (Is_pick==1&&Is_place==0)
+    {
+        ArmState_t new_state;
+
+        switch (level_flag)
+        {
+            case 0:
+                new_state = ARM_STATE_SKY;
+                break;
+
+            case 1:
+                new_state = ARM_STATE_LOW;
+                break;
+
+            case 2:
+                new_state = ARM_STATE_MID;
+                break;
+
+            default:
+                new_state = ARM_STATE_MID;
+                break;
+        }
+
+
+        if (ArmControl.state != new_state)
+        {
+            ArmControl.state = new_state;
+
+        }
+        Is_pick=0;
+        Is_place=0;
+        Is_store=0;
+        Is_ready=0;
+        Is_reset=0;
+
+        return;
+    }
+
+
+   
+    if (Is_place==1&&Is_pick==0)
+    {
+        ArmState_t new_state;
+
+        switch (level_flag)
+        {
+            case 1:
+                new_state = ARM_STATE_LOW1;
+                break;
+
+            case 2:
+                new_state = ARM_STATE_MID1;
+                break;
+
+            case 3:
+                new_state = ARM_STATE_HIGH;
+                break;
+
+            default:
+            new_state = ARM_STATE_LOW1;
+                break;
+        }
+
+
+        if (ArmControl.state != new_state)
+        {
+            ArmControl.state = new_state;
+           
+        }
+
+        Is_pick=0;
+        Is_place=0;
+        Is_store=0;
+        Is_ready=0;
+        Is_reset=0;
+
+        return;
+    }
+
+
+    Is_pick=0;
+    Is_place=0;
+    Is_store=0;
+    Is_ready=0;
+    Is_reset=0;
+}
+
+
+
+
+
+//状态更新
+void Arm_Control_Task(void *argument)
+{
+    (void)argument;
+    for (;;)
+    {
+        osDelay(2);
+         if (ArmControl.state != ArmControl.last_state)
+        {
+             ArmControl.running = false;
+            ArmControl.finish = false;
+             ArmControl.last_state = ArmControl.state;
+        }
+    //     switch (ArmControl.state)
+    //     {
+    //         case ARM_STATE_NONE:
+    //             Arm_NONE_Process();
+    //             break;
+
+
+    //         case ARM_STATE_READY:
+
+    //             Arm_Ready_Process();
+
+    //             break;
+
+
+    //         case ARM_STATE_STORT:
+
+    //             Arm_STORT_Process();
+    //             break;
+
+
+    //         case ARM_STATE_KEEP:
+    //             Arm_KEEP_Process();
+    //             break;
+
+    //         case ARM_STATE_LOW:
+    //             Arm_LOW_Process();
+    //             break;
+            
+
+    //         case ARM_STATE_LOW1:
+    //             Arm_LOW1_Process();
+    //             break;
+
+
+    //         case ARM_STATE_MID:
+    //             Arm_MID_Process();
+    //             break;
+
+
+
+    //         case ARM_STATE_MID1:
+    //             Arm_MID1_Process();
+    //             break;
+
+
+    //         case ARM_STATE_HIGH:
+    //             Arm_HIGH_Process();
+    //             break;
+
+    //         case ARM_STATE_SKY:
+    //             Arm_SKY_Process();
+    //             break;
+
+
+    //         default:
+    //         ArmControl.running = false;
+    //             ArmControl.finish = true;
+
+    //             break;
+    //     }
+    //     if (ArmControl.running == true)
+    //     {
+    //         Arm_Interpolation_Update();
+    //     }
     }
 }
-void Sky_Init(void)
+
+
+
+
+
+void Arm_Motor_Enable(void)
 {
-    sky.enable = false;
-    sky.ResetFlag = false;
-    sky.JointGo = &Unitree_motors[UnitreeMotor_Use_ID - 1];
-    sky.JointAK = &Zmotor[ZdriveMotor_Use_ID - 1];
-    sky.Sky_Mode = Sky_Carry_Mode;
-    sky.Go_time = 0;
-    /*Unitree Go Motor初始化*/
-    sky.JointGo->begin = true;
-    sky.JointGo->enable = true;
-    sky.JointGo->set_zero = true;
-    sky.JointGo_lastposition = sky.JointGo->data.position;
-    sky.JointGo->cmd.kp=0.4;
-    sky.JointGo->cmd.kd=0.04;
+    Unitree_motors[0].enable = true;
+    Unitree_motors[1].enable = true;
 
-    /*AK-80初始化*/
-    sky.JointAK->Begin = true;
-    sky.JointAK->mode = Zdrive_Postion;
-    sky.JointAK->param.ReductionRatio = JOINTAK_REDUCTION_RATIO;
+    DJmotor[0].Begin = true;
 
-    sky.FinishFlag = 1;
-    Jaw_Init();
+    DJmotor[0].MODE_Set = DJ_Position;
+}
+
+
+void Arm_Motor_Disable(void)
+{
+    Unitree_motors[0].enable = false;
+    Unitree_motors[1].enable = false;
+
+    DJmotor[0].Begin = false;
+
+    DJmotor[0].MODE_Set = DJ_Disable;
+}
+
+
+
+void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
+{
+    if (Rxheader.IdType == FDCAN_EXTENDED_ID)
+           {
+               switch (Rxheader.Identifier)
+               {
+
+           
+
+                   case 0x01020211U:
+
+                       if (Rx_data[0] == 'E')
+                       {
+                           Arm_Motor_Enable();
+                       }
+                       else if (Rx_data[0] == 'D')
+                       {
+                           Arm_Motor_Disable();
+                       }
+
+                       break;
+
+
+                   //取块准备
+                   case 0x01020301U:
+
+                       if (Rx_data[0] == 'P')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_reset = 0U;
+
+                           Is_ready = 1U;
+                       }
+
+                       break;
+
+                   //位置调节
+                   case 0x01020302U:
+
+                       if (Rx_data[0] <= 3U)
+                       {
+                           level_flag = Rx_data[0];
+                       }
+
+                       break;
+
+
+                   //存块
+                   case 0x01020303U:
+
+                       if (Rx_data[0] == 'S')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+
+                           Is_store = 1U;
+                       }
+
+                       break;
+
+
+                   //取存块
+                   case 0x01020304U:
+
+                       if (Rx_data[0] == 'G')
+                       {
+                           Is_place = 0U;
+                           Is_store = 1U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+
+                           Is_pick = 0U;
+                       }
+
+                       break;
+
+
+                   //放块
+                   case 0x01020305U:
+
+                       if (Rx_data[0] == 'R')
+                       {
+                           Is_pick  = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+
+                           Is_place = 1U;
+                       }
+
+                       break;
+
+
+                   //返回零位
+                   case 0x01020306U:
+
+                       if (Rx_data[0] == 'Z')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+
+                           Is_reset = 1U;
+                       }
+
+                       break;
+
+                   //取块开始
+                   case 0x01020307U:
+
+                       if (Rx_data[0] == 'T')
+                       {
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+
+                           Is_pick = 1U;
+                       }
+
+                       break;
+
+
+                   //放块准备
+                   case 0x01020308U:
+
+                       if (Rx_data[0] == 'F')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_reset = 0U;
+
+                           Is_ready = 1U;
+                       }
+
+                       break;
+
+
+                   default:
+
+                       break;
+               }
+           }
+
 }

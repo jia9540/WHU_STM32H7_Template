@@ -18,16 +18,16 @@ extern "C"
 /* ------------------------------------------------------------------ */
 /* 电机驱动开关:1 = 编译并使用,0 = 不编译                               */
 /* ------------------------------------------------------------------ */
-#define USE_DJ 0
+#define USE_DJ 1
 #define USE_VESC 0 // 未验证,不要启用
-#define USE_ZMDR 1
+#define USE_ZMDR 0
 #define USE_UNITREE 1
 
 /* ------------------------------------------------------------------ */
 /* DJI M2006 / M3508                                                    */
 /* ------------------------------------------------------------------ */
 #define MOTOR_DJI_COUNT 4U  /* 必须为 4 或 8(DJI CAN 打包要求) */
-#define MOTOR_DJI_CAN_BUS 2 /* 0=FDCAN1,1=FDCAN2,2=FDCAN3 */
+#define MOTOR_DJI_CAN_BUS 1 /* 0=FDCAN1,1=FDCAN2,2=FDCAN3 */
 
 #define MOTOR_M2006_COUNT 4U
 #define MOTOR_M3508_COUNT 0U
@@ -67,8 +67,8 @@ extern "C"
 #define RS_485_U7_Pin GPIO_PIN_1
 #define UNITREE_MOTOR_NUM MOTOR_UNITREE_COUNT
 #define UNITREE_RX_BUFFER_SIZE 64U
-#define MOTOR_UNITREE_DEFAULT_KP 0.02f
-#define MOTOR_UNITREE_DEFAULT_KW 0.02f
+#define MOTOR_UNITREE_DEFAULT_KP 0.4f
+#define MOTOR_UNITREE_DEFAULT_KW 0.04f
 
 #ifdef __cplusplus
 }
