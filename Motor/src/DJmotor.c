@@ -56,7 +56,7 @@ void DJmotor_Init(void)
     dj2006_param.Gear_ratio = 1.0f;
     dj2006_param.Reduction_ratio = M2006_RATIO;
     dj2006_param.PulsePerRound = 8191U;
-    dj2006_param.CurrentLimit_raw =8000;
+    dj2006_param.CurrentLimit_raw =10000;
 
     dj3508_param.ParamID = 0x200U;
     dj3508_param.Gear_ratio = 1.0f;

@@ -2,9 +2,14 @@
 
 #include "DJmotor.h"
 
-#define ARM_INTERPOLATION_DT    0.002f     
+#define ARM_INTERPOLATION_DT    0.001f
 #define ARM_EPSILON             0.0001f
-#define ARM_MOVE_TIME           3.0f
+#define ARM_MOVE_TIME           0.55f
+
+//五次多项式轨迹参数(归一化时间域 t∈[0,1],末速度/末加速度固定为0)
+//起始速度 s'(0) 与起始加速度 s''(0) 可配置;取0时为平滑起步(等价smoothstep)
+#define ARM_START_VELOCITY    0.8f
+#define ARM_START_ACCEL       4.6f
 
 
 volatile uint8_t level_flag=0;
@@ -13,6 +18,9 @@ volatile uint8_t Is_place=0;
 volatile uint8_t Is_store=0;
 volatile uint8_t Is_ready=0;
 volatile uint8_t Is_reset=0;
+volatile uint8_t Is_on=0;
+volatile uint8_t Is_open=0;
+
 ArmControl_t ArmControl;
 
 
@@ -30,7 +38,11 @@ void Relay_OFF(void)
 
 
 
-//时间归一化,计算轨迹设定角度
+//时间归一化,计算轨迹设定角度(五次多项式)
+//s(t)=a1*t+a2*t^2+a3*t^3+a4*t^4+a5*t^5, 边界条件:
+//  s(0)=0, s(1)=1
+//  s'(0)=v0(可配置), s'(1)=0
+//  s''(0)=acc0(可配置), s''(1)=0
 static float Target_Quintic_Interpolation(float start_angle,float target,float time,float total_time)
 {
     float t;
@@ -39,6 +51,9 @@ static float Target_Quintic_Interpolation(float start_angle,float target,float t
     float t4;
     float t5;
     float s;
+    float v0   = ARM_START_VELOCITY;
+    float acc0 = ARM_START_ACCEL;
+
     if (total_time<=0)
     {
         return target;
@@ -55,13 +70,18 @@ static float Target_Quintic_Interpolation(float start_angle,float target,float t
         t=1.0;
     }
 
-
     t2=t*t;
     t3=t2*t;
     t4=t3*t;
     t5=t4*t;
 
-    s=10.0f*t5-15.0f*t4+6.0f*t3;
+    //由边界条件解出的系数:
+    //a1=v0, a2=acc0/2, a3=10-6v0-1.5acc0, a4=-15+8v0+1.5acc0, a5=6-3v0-0.5acc0
+    s= v0*t
+      +0.5f*acc0*t2
+      +(10.0f-6.0f*v0-1.5f*acc0)*t3
+      +(-15.0f+8.0f*v0+1.5f*acc0)*t4
+      +(6.0f-3.0f*v0-0.5f*acc0)*t5;
 
     return start_angle+(target-start_angle)*s;
 
@@ -111,6 +131,12 @@ static void Arm_Interpolation_Update(void)
         DJmotor[0].valSet.angle_deg = ArmControl.dj.target;
         ArmControl.running = false;
         ArmControl.finish = true;
+        // Is_pick=0;
+        // Is_place=0;
+        // Is_store=0;
+        // Is_reset=0;
+        // Is_ready=0;
+
     }
 
 }
@@ -416,77 +442,100 @@ void Arm_Control_Task(void *argument)
     (void)argument;
     for (;;)
     {
-        osDelay(2);
+        osDelay(1);
          if (ArmControl.state != ArmControl.last_state)
         {
              ArmControl.running = false;
             ArmControl.finish = false;
              ArmControl.last_state = ArmControl.state;
         }
-    //     switch (ArmControl.state)
-    //     {
-    //         case ARM_STATE_NONE:
-    //             Arm_NONE_Process();
-    //             break;
+
+        if(Is_open)
+        {
+            Relay_ON();
+        }
+        else{
+            Relay_OFF();
+        }
 
 
-    //         case ARM_STATE_READY:
+        if(Is_on==1)
+        {
+           Arm_Motor_Enable();
+            //Relay_ON();
+        }
+        else{
+           Arm_Motor_Disable();
+           // Relay_OFF();
+        }
+        switch (ArmControl.state)
+        {
+            case ARM_STATE_NONE:
+                Arm_NONE_Process();
+                break;
 
-    //             Arm_Ready_Process();
 
-    //             break;
+            case ARM_STATE_READY:
 
+                Arm_Ready_Process();
 
-    //         case ARM_STATE_STORT:
-
-    //             Arm_STORT_Process();
-    //             break;
+                break;
 
 
-    //         case ARM_STATE_KEEP:
-    //             Arm_KEEP_Process();
-    //             break;
+            // case ARM_STATE_STORT:
 
-    //         case ARM_STATE_LOW:
-    //             Arm_LOW_Process();
-    //             break;
+            //     Arm_STORT_Process();
+            //     break;
+
+
+            case ARM_STATE_KEEP:
+                Arm_KEEP_Process();
+                break;
+
+            case ARM_STATE_LOW:
+                Arm_LOW_Process();
+                break;
             
 
-    //         case ARM_STATE_LOW1:
-    //             Arm_LOW1_Process();
-    //             break;
+            case ARM_STATE_LOW1:
+                Arm_LOW1_Process();
+                break;
 
 
-    //         case ARM_STATE_MID:
-    //             Arm_MID_Process();
-    //             break;
+            case ARM_STATE_MID:
+                Arm_MID_Process();
+                break;
 
 
 
-    //         case ARM_STATE_MID1:
-    //             Arm_MID1_Process();
-    //             break;
+            case ARM_STATE_MID1:
+                Arm_MID1_Process();
+                break;
 
 
-    //         case ARM_STATE_HIGH:
-    //             Arm_HIGH_Process();
-    //             break;
+            case ARM_STATE_HIGH:
+                Arm_HIGH_Process();
+                break;
 
-    //         case ARM_STATE_SKY:
-    //             Arm_SKY_Process();
-    //             break;
+            case ARM_STATE_SKY:
+                Arm_SKY_Process();
+                break;
 
 
-    //         default:
-    //         ArmControl.running = false;
-    //             ArmControl.finish = true;
+            default:
+            ArmControl.running = false;
+                ArmControl.finish = true;
 
-    //             break;
-    //     }
-    //     if (ArmControl.running == true)
-    //     {
-    //         Arm_Interpolation_Update();
-    //     }
+                break;
+        }
+        if(Is_on==1)
+        {
+
+        if (ArmControl.running == true)
+        {
+            Arm_Interpolation_Update();
+        }
+       }
     }
 }
 
@@ -509,10 +558,9 @@ void Arm_Motor_Disable(void)
 {
     Unitree_motors[0].enable = false;
     Unitree_motors[1].enable = false;
-
+    DJmotor[0].MODE_Set = DJ_Disable;
     DJmotor[0].Begin = false;
 
-    DJmotor[0].MODE_Set = DJ_Disable;
 }
 
 
@@ -530,11 +578,11 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        if (Rx_data[0] == 'E')
                        {
-                           Arm_Motor_Enable();
+                        Is_on=1;
                        }
                        else if (Rx_data[0] == 'D')
                        {
-                           Arm_Motor_Disable();
+                        Is_on  =0;
                        }
 
                        break;

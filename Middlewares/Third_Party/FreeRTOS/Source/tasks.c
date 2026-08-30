@@ -3734,7 +3734,6 @@ static void prvInitialiseTaskLists( void )
         vListInitialise( &xSuspendedTaskList );
     }
     #endif /* INCLUDE_vTaskSuspend */
-
     /* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
      * using list2. */
     pxDelayedTaskList = &xDelayedTaskList1;

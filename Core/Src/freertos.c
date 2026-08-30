@@ -59,7 +59,7 @@ const osThreadAttr_t AlarmTask_attributes = {
 osThreadId_t VOFASendTaskHandle;
 const osThreadAttr_t VOFASendTask_attributes = {
   .name = "VOFASendTask",
-  .stack_size = 64 * 4,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -68,7 +68,7 @@ const osThreadAttr_t VOFASendTask_attributes = {
 osThreadId_t Arm_Control_TaskTaskHandle;
 const osThreadAttr_t Arm_Control_TaskTask_attributes = {
   .name = "Arm_Control_TaskTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE END FunctionPrototypes */
@@ -110,11 +110,11 @@ void MX_FREERTOS_Init(void) {
   AlarmTaskHandle = osThreadNew(Alarm_Task, NULL, &AlarmTask_attributes);
 
   /* creation of VOFASendTask */
-  VOFASendTaskHandle = osThreadNew(VOFA_SendTask, NULL, &VOFASendTask_attributes);
+  // VOFASendTaskHandle = osThreadNew(VOFA_SendTask, NULL, &VOFASendTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-Arm_Control_TaskTaskHandle=osThreadNew(Arm_Control_Task, NULL, &Arm_Control_TaskTask_attributes);
+  Arm_Control_TaskTaskHandle=osThreadNew(Arm_Control_Task, NULL, &Arm_Control_TaskTask_attributes);
 
 
   /* USER CODE END RTOS_THREADS */
