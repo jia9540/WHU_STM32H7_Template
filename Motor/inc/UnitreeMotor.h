@@ -126,6 +126,8 @@ extern "C"
         volatile bool set_zero; /* true=下一次 Func 将该电机当前位置设为零点 */
         bool begin;             /* true=参与周期发送 */
 
+        float zero_pos;//认为的设定零点以后的几何角度
+
         UnitreeMotorCmd_t cmd;   /* 用户写目标值 */
         UnitreeMotorData_t data; /* 最新反馈(已修正零位) */
         float zero_offset;       /* 控制坐标系下的零位偏移 */

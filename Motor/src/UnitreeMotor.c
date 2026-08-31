@@ -11,6 +11,7 @@
 #include "usart.h"
 #include "crc_ccitt.h"
 #include "ring_buffer.h"
+#include "kinematics.h"
 
 #if USE_UNITREE
 
@@ -31,6 +32,8 @@ static uint8_t s_unitree_rx_queue_buf[UNITREE_RX_BUFFER_SIZE];
 static uint8_t s_unitree_frame[UNITREE_FRAME_LENGTH];
 static uint8_t s_unitree_frame_len = 0U;
 static bool s_unitree_frame_started = false;
+
+static bool set_cur_init = true;
 
 static bool s_unitree_initialized = false;
 static uint8_t s_unitree_tx_index = 0U;
@@ -135,10 +138,12 @@ void UnitreeMotor_Init(void)
         Unitree_motors[i].zero_offset = 0.0f;
         Unitree_motors[i].begin = true;
     }
+    Unitree_motors[0].zero_pos = ARM_U1_ZERO_POS;
+    Unitree_motors[1].zero_pos = ARM_U2_ZERO_POS;
 
     s_unitree_tx_index = 0U;
     s_unitree_initialized = true;
-    
+
     RingBuffer_Init(&s_unitree_rx_queue, s_unitree_rx_queue_buf, sizeof(s_unitree_rx_queue_buf));
     s_unitree_frame_len = 0U;
     s_unitree_frame_started = false;
@@ -388,7 +393,7 @@ void UnitreeMotor_UART_RxHandler(const uint8_t *data, uint16_t size)
 
 void UnitreeMotor_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if(huart == NULL || huart != UnitreeMotor_GetUart())
+    if (huart == NULL || huart != UnitreeMotor_GetUart())
     {
         return;
     }
@@ -442,8 +447,10 @@ static void UnitreeMotor_SetZero(int motor_id)
         for (uint32_t i = 0U; i < UNITREE_MOTOR_NUM; i++)
         {
             Unitree_motors[i].zero_offset += Unitree_motors[i].data.position;
-            Unitree_motors[i].cmd.position = 0.0f;
-            Unitree_motors[i].data.position = 0.0f;
+            // Unitree_motors[i].cmd.position = Unitree_motors[i].zero_pos;
+            // Unitree_motors[i].data.position = Unitree_motors[i].zero_pos;
+            Unitree_motors[i].cmd.position = 0.f;
+            Unitree_motors[i].data.position = 0.f;
         }
         return;
     }
@@ -508,6 +515,11 @@ void UnitreeMotor_Func(void)
     for (uint32_t i = 0U; i < UNITREE_MOTOR_NUM; i++)
     {
         UnitreeMotor *motor = &Unitree_motors[i];
+        if (!set_cur_init && motor->data.correct)
+        {
+            motor->cmd.position = motor->data.position;
+            set_cur_init = true;
+        }
 
         if (motor->enable)
         {
@@ -518,7 +530,7 @@ void UnitreeMotor_Func(void)
             motor->cmd.mode = UNITREE_MOTOR_MODE_IDLE;
         }
 
-        if (motor->set_zero)
+        if (motor->set_zero && motor->data.correct)
         {
             UnitreeMotor_SetZero((int)i);
             motor->set_zero = false;

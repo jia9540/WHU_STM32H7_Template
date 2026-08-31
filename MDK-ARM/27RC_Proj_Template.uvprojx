@@ -819,6 +819,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\src\holding_jaw.c</FilePath>
             </File>
+            <File>
+              <FileName>kinematics.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\src\kinematics.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

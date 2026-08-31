@@ -11,9 +11,6 @@
 #include "gpio.h"
 
 
-#define ARM_U1_ZERO_POS    
-#define ARM_U2_ZERO_POS
-
 //  初始状态
 #define ARM_U1_START_POS    0.088f
 #define ARM_U2_START_POS    0.863f
