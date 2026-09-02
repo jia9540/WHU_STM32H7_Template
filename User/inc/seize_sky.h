@@ -9,65 +9,72 @@
 #include "DJmotor.h"
 #include "cmsis_os.h"
 #include "gpio.h"
+#include "kinematics.h"
+#include "fdcan.h"
+
 
 
 //  初始状态
-#define ARM_U1_START_POS    0.088f
-#define ARM_U2_START_POS    0.863f
+#define ARM_U1_START_POS    0.0f
+#define ARM_U2_START_POS    0.0f
 #define ARM_DJ_START_POS    0.0f
 
 
 //  准备状态
-#define ARM_U1_READY_POS    0.832f
-#define ARM_U2_READY_POS    1.3f
-#define ARM_DJ_READY_POS    0.0f
+#define ARM_U1_READY_POS    0.64f
+#define ARM_U2_READY_POS    0.52f
+#define ARM_DJ_READY_POS    -240.0f
+// //  准备状态
+// #define ARM_U1_READY_POS    500.f
+// #define ARM_U2_READY_POS    400.f
+// #define ARM_DJ_READY_POS    0.0f
 
 
 //  持块状态
-#define ARM_U1_KEEP_POS    0.832f
-#define ARM_U2_KEEP_POS    1.003f
-#define ARM_DJ_KEEP_POS    0.0f
+#define ARM_U1_KEEP_POS    0.64f
+#define ARM_U2_KEEP_POS    0.52f
+#define ARM_DJ_KEEP_POS    -240.0f
 
 
 //  存贮状态
-#define ARM_U1_STORE_POS    0.832f
-#define ARM_U2_STORE_POS    1.003f
-#define ARM_DJ_STORE_POS    0.0f
+#define ARM_U1_STORE_POS    0.64f
+#define ARM_U2_STORE_POS    0.52f
+#define ARM_DJ_STORE_POS    -240.0f
 
 //取天空块
-#define ARM_U1_SKY_POS    0.82f
-#define ARM_U2_SKY_POS    0.645f
-#define ARM_DJ_SKY_POS    0.0f
+#define ARM_U1_SKY_POS    0.672f
+#define ARM_U2_SKY_POS    -0.31f
+#define ARM_DJ_SKY_POS    -210.0f
 
 //  底层取块
-#define ARM_U1_LOW_POS      0.832f
-#define ARM_U2_LOW_POS      1.003f
-#define ARM_DJ_LOW_POS      0.0f
+#define ARM_U1_LOW_POS      0.64f
+#define ARM_U2_LOW_POS      0.38f
+#define ARM_DJ_LOW_POS      -230.0f
 
 
 //底层放块
-#define ARM_U1_LOW1_POS      0.872f
-#define ARM_U2_LOW1_POS      1.114f
-#define ARM_DJ_LOW1_POS      0.0f
+#define ARM_U1_LOW1_POS      0.64f
+#define ARM_U2_LOW1_POS      0.52f
+#define ARM_DJ_LOW1_POS      -240.0f
 
 
 //  中层取块
-#define ARM_U1_MID_POS      0.2675f
-#define ARM_U2_MID_POS      1.224f
-#define ARM_DJ_MID_POS      0.0f
+#define ARM_U1_MID_POS      0.64f
+#define ARM_U2_MID_POS      0.45f
+#define ARM_DJ_MID_POS      -140.0f
 
 
 //中层放块
-#define ARM_U1_MID1_POS      0.27f
-#define ARM_U2_MID1_POS      1.6f
-#define ARM_DJ_MID1_POS      0.0f
+#define ARM_U1_MID1_POS      0.64f
+#define ARM_U2_MID1_POS      0.52f
+#define ARM_DJ_MID1_POS      -140.0f
 
 
 
 //  高层放块
-#define ARM_U1_HIGH_POS     0.878f
-#define ARM_U2_HIGH_POS     1.89f
-#define ARM_DJ_HIGH_POS     0.0f
+#define ARM_U1_HIGH_POS     0.90f
+#define ARM_U2_HIGH_POS     1.50f
+#define ARM_DJ_HIGH_POS     -185.0f
 
 
 
@@ -79,6 +86,7 @@ extern volatile uint8_t Is_ready;
 extern volatile uint8_t Is_reset;
 extern volatile uint8_t Is_on;
 extern volatile uint8_t Is_open;
+extern volatile uint8_t Is_ok;
 
 
 
@@ -146,6 +154,7 @@ void Arm_Motor_Enable(void);
 void Arm_Motor_Disable(void);
 void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data);
 
+void Arm_Transmit(void);
 
 
 

@@ -4,14 +4,14 @@
 /* ==================== 二自由度机械臂几何参数 ==================== */
 
 // 大臂 / 小臂初始几何角度(rad),标定前的占位值,标定后修改
-#define ARM_U1_ZERO_POS    0.1f
-#define ARM_U2_ZERO_POS    0.1f
+#define ARM_U1_ZERO_POS    2.44f
+#define ARM_U2_ZERO_POS    -2.75f
 
 // 大臂长 / 小臂长(mm)
 #define ARM_U1_LENTH 400.0f
 #define ARM_U2_LENTH 400.0f
 
-// 小臂角度减速比: 小臂几何角 = 小臂电机角 * ARM_U2_RATIO
+// 小臂角度减速比: 小臂几何角 = (大臂电机角 - 小臂电机角) * ARM_U2_RATIO
 #define ARM_U2_RATIO (5.0f / 6.0f)
 
 // 二维向量(末端坐标,单位 mm)

@@ -31,6 +31,7 @@
 #include "holding_jaw.h"
 
 static uint8_t Func_cnt = 0;
+static uint8_t tim_count =0;
 
 __RAM_D2_ ALIGN_32B uint8_t UART1_RxBuffer[UART_RX_BUFFER_SIZE] = {0};
 __RAM_D2_ ALIGN_32B uint8_t UART3_RxBuffer[UART_RX_BUFFER_SIZE] = {0};
@@ -48,8 +49,7 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
            出队(命名归驱动所有)。拆分关闭时 CAN3 出队是空操作(队列可能
            承载 DJI/其他);ZDrive 若配在 CAN1,需注意此处会双重出队。 */
 
-        
-
+      
          Arm_State_Update();
 
 
@@ -86,9 +86,18 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             ZdriveFunc();
 #endif
 
-
-
         }
+
+    tim_count++;
+    if(tim_count>=20)
+    {
+        tim_count=0;
+        Arm_Transmit();
+    }
+
+
+
+
     }
     /* TIM3/4/5 是备用定时器,需要的话在这里加分支,并在 main.c 里启动 */
 }
@@ -113,12 +122,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
 
 
-
-            Arm_Receive(Rxheader,Rx_data);
-
-
-
-
 #if USE_ZMDR
             ZdriveReceive(Rxheader, Rx_data, 0U);
 #endif
@@ -140,6 +143,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         }
         else if (hfdcan == &hfdcan3)
         {
+
+            
+            Arm_Receive(Rxheader,Rx_data);
+
+
+
 #if USE_ZMDR
             ZdriveReceive(Rxheader, Rx_data, 2U);
 #endif

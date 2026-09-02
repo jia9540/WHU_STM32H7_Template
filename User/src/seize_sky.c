@@ -2,9 +2,12 @@
 
 #include "DJmotor.h"
 
+
+
 #define ARM_INTERPOLATION_DT    0.001f
 #define ARM_EPSILON             0.0001f
-#define ARM_MOVE_TIME           0.55f
+#define ARM_MOVE_TIME           1.0f
+#define ARM_MOVE_SKY_TIME       2.0f
 
 //五次多项式轨迹参数(归一化时间域 t∈[0,1],末速度/末加速度固定为0)
 //起始速度 s'(0) 与起始加速度 s''(0) 可配置;取0时为平滑起步(等价smoothstep)
@@ -20,7 +23,7 @@ volatile uint8_t Is_ready=0;
 volatile uint8_t Is_reset=0;
 volatile uint8_t Is_on=0;
 volatile uint8_t Is_open=0;
-
+volatile uint8_t Is_ok=0;
 ArmControl_t ArmControl;
 
 
@@ -105,6 +108,27 @@ static void Arm_Interpolation_Start(float u1_target,float u2_target, float dj_ta
     ArmControl.finish = false;
 
 }
+
+
+// static void Arm_Interpolation_Pos_Start(float pos_x,float pos_y,float dj_target,float move_time)
+// {
+//     Vec2 Pos_target;
+//     Pos_target.x=pos_x;
+//     Pos_target.y=pos_y;
+
+//     Unitree_Theta_t angle_target;
+//     angle_target=Inverse(Pos_target);
+
+//     Arm_Interpolation_Start(angle_target.u1_theta,angle_target.u2_theta,dj_target,move_time);
+// }
+
+
+
+
+
+
+
+
 
 
 //轨迹点更新
@@ -194,7 +218,7 @@ static void Arm_Ready_Process(void)
     if (ArmControl.running == false &&
         ArmControl.finish == false)
     {
-        Arm_Interpolation_Start(ARM_U1_READY_POS,ARM_U2_READY_POS,ARM_DJ_READY_POS,ARM_MOVE_TIME);
+       Arm_Interpolation_Start(ARM_U1_READY_POS,ARM_U2_READY_POS,ARM_DJ_READY_POS,ARM_MOVE_TIME);
     }
 }
 
@@ -565,6 +589,9 @@ void Arm_Motor_Disable(void)
 
 
 
+
+
+
 void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 {
     if (Rxheader.IdType == FDCAN_EXTENDED_ID)
@@ -573,7 +600,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                {
 
            
-
+                    //使能失能（改）
                    case 0x01020211U:
 
                        if (Rx_data[0] == 'E')
@@ -588,7 +615,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        break;
 
 
-                   //取块准备
+                   //取块准备（改）
                    case 0x01020301U:
 
                        if (Rx_data[0] == 'P')
@@ -603,8 +630,8 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        break;
 
-                   //位置调节
-                   case 0x01020302U:
+                   //位置调节（改）
+                   case 0x01020002U:
 
                        if (Rx_data[0] <= 3U)
                        {
@@ -614,39 +641,39 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        break;
 
 
-                   //存块
-                   case 0x01020303U:
+                //    //存块
+                //    case 0x01020303U:
 
-                       if (Rx_data[0] == 'S')
-                       {
-                           Is_pick  = 0U;
-                           Is_place = 0U;
-                           Is_ready = 0U;
-                           Is_reset = 0U;
+                //        if (Rx_data[0] == 'S')
+                //        {
+                //            Is_pick  = 0U;
+                //            Is_place = 0U;
+                //            Is_ready = 0U;
+                //            Is_reset = 0U;
 
-                           Is_store = 1U;
-                       }
+                //            Is_store = 1U;
+                //        }
 
-                       break;
-
-
-                   //取存块
-                   case 0x01020304U:
-
-                       if (Rx_data[0] == 'G')
-                       {
-                           Is_place = 0U;
-                           Is_store = 1U;
-                           Is_ready = 0U;
-                           Is_reset = 0U;
-
-                           Is_pick = 0U;
-                       }
-
-                       break;
+                //        break;
 
 
-                   //放块
+                //    //取存块
+                //    case 0x01020304U:
+
+                //        if (Rx_data[0] == 'G')
+                //        {
+                //            Is_place = 0U;
+                //            Is_store = 1U;
+                //            Is_ready = 0U;
+                //            Is_reset = 0U;
+
+                //            Is_pick = 0U;
+                //        }
+
+                //        break;
+
+
+                   //放块开始（改）
                    case 0x01020305U:
 
                        if (Rx_data[0] == 'R')
@@ -662,8 +689,8 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        break;
 
 
-                   //返回零位
-                   case 0x01020306U:
+                   //返回零位（改）
+                   case 0x01020200U:
 
                        if (Rx_data[0] == 'Z')
                        {
@@ -677,7 +704,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        break;
 
-                   //取块开始
+                   //取块开始(改)
                    case 0x01020307U:
 
                        if (Rx_data[0] == 'T')
@@ -693,7 +720,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        break;
 
 
-                   //放块准备
+                   //放块准备（改）
                    case 0x01020308U:
 
                        if (Rx_data[0] == 'F')
@@ -709,10 +736,89 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        break;
 
 
+                    //取块完成（改）
+                    case 0x01020309U:
+
+                       if (Rx_data[0] == 'H')
+                       {
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 1U;
+                           Is_reset = 0U;
+
+                           Is_pick = 0U;
+                       }
+
+                       break;
+
+                    //放块完成（改）
+                    case 0x0102030AU:
+
+                       if (Rx_data[0] == 'O')
+                       {
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 1U;
+                           Is_reset = 0U;
+
+                           Is_pick = 0U;
+                       }
+
+                       break;                  
+
+
                    default:
 
                        break;
                }
            }
+
+}
+
+
+
+
+
+
+
+
+void Arm_Transmit(void)
+{
+    static uint8_t tx_data[1] = {0};
+    FDCAN_TxHeaderTypeDef tx_header = {0};
+
+    tx_header.Identifier = 0x03020101U;
+
+    tx_header.IdType = FDCAN_EXTENDED_ID;
+
+    tx_header.TxFrameType = FDCAN_DATA_FRAME;
+
+    tx_header.DataLength = FDCAN_DLC_BYTES_1;
+
+    tx_header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+    tx_header.BitRateSwitch = FDCAN_BRS_OFF;
+    tx_header.FDFormat = FDCAN_CLASSIC_CAN;
+    tx_header.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+    tx_header.MessageMarker = 0;
+
+    tx_data[0] = level_flag;
+
+//    if( HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1,&tx_header,tx_data)!=HAL_OK)
+//    {
+//         Is_ok=1;
+//    }
+//    HAL_StatusTypeDef ret = HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_header, tx_data);
+// if (ret != HAL_OK) {
+//     // 通过串口或调试器查看 ret 的值
+//     Is_ok = ret;  // 把具体错误码存下来
+// }
+
+HAL_StatusTypeDef ret = HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &tx_header, tx_data);
+if (ret != HAL_OK) {
+    Is_ok = ret;
+    HAL_FDCAN_StateTypeDef state = hfdcan3.State;   // 观察值：0=RESET, 1=READY, 2=LISTENING, 4=ERROR
+    uint32_t err = HAL_FDCAN_GetError(&hfdcan3); // 读取硬件错误码
+    // 可通过串口打印出来，或存储在全局变量中调试
+}
 
 }
