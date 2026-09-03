@@ -31,6 +31,7 @@ static uint8_t Is_enable=0;
 
 
 
+void Sys_res
 
 void Relay_ON(void)
 {
@@ -519,7 +520,7 @@ void Arm_Control_Task(void *argument)
             }
         }
 
-        
+
         switch (ArmControl.state)
         {
             case ARM_STATE_NONE:
