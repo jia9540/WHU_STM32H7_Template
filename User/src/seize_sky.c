@@ -27,6 +27,8 @@ volatile uint8_t Is_open=0;
 volatile uint8_t Is_ok=0;
 ArmControl_t ArmControl;
 
+static uint8_t Is_enable=0;
+
 
 
 
@@ -503,13 +505,21 @@ void Arm_Control_Task(void *argument)
 
         if(Is_on==1)
         {
+            if(Is_enable==0)
+            {
            Arm_Motor_Enable();
-            //Relay_ON();
+           Is_enable=1;
+            }
         }
         else{
+            if(Is_enable==1)
+            {
            Arm_Motor_Disable();
-           // Relay_OFF();
+           Is_enable=0;
+            }
         }
+
+        
         switch (ArmControl.state)
         {
             case ARM_STATE_NONE:
@@ -638,7 +648,8 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        if (Rx_data[0] == 3)
                        {
-                        Is_keep=1;
+                       // Is_keep=1;
+                       Is_ready=1;
                        }                     
 
                        break;
@@ -753,9 +764,9 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 0U;
+                           Is_ready = 1U;
                            Is_reset = 0U;
-                           Is_keep =1U;
+                           Is_keep =0U;
 
                            Is_pick = 0U;
                        }
@@ -805,9 +816,9 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 0U;
+                           Is_ready = 1U;
                            Is_reset = 0U;
-                            Is_keep=1U;
+                            Is_keep=0U;
                            Is_pick = 0U;
                        }
 

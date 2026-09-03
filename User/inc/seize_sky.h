@@ -20,20 +20,20 @@
 #define ARM_DJ_START_POS    0.0f
 
 
-//  准备状态
-#define ARM_U1_READY_POS    1.51f
-#define ARM_U2_READY_POS    -0.25f
-#define ARM_DJ_READY_POS    -225.0f
+//  准备状态1
+#define ARM_U1_READY_POS    1.6f
+#define ARM_U2_READY_POS    0.35f
+#define ARM_DJ_READY_POS    -233.7f
 // //  准备状态
 // #define ARM_U1_READY_POS    500.f
 // #define ARM_U2_READY_POS    400.f
 // #define ARM_DJ_READY_POS    0.0f
 
 
-//  持块状态
-#define ARM_U1_KEEP_POS    1.17f
-#define ARM_U2_KEEP_POS    0.22f
-#define ARM_DJ_KEEP_POS    -250.0f
+//  持块状态1
+#define ARM_U1_KEEP_POS    1.6f
+#define ARM_U2_KEEP_POS    0.35f
+#define ARM_DJ_KEEP_POS    -233.7f
 
 
 // //  存贮状态
@@ -42,39 +42,39 @@
 // #define ARM_DJ_STORE_POS    -240.0f
 
 //取天空块
-#define ARM_U1_SKY_POS    1.61f
-#define ARM_U2_SKY_POS    -0.79f
-#define ARM_DJ_SKY_POS    -205.0f
+#define ARM_U1_SKY_POS    1.71f
+#define ARM_U2_SKY_POS    -0.65f
+#define ARM_DJ_SKY_POS    -205.7f
 
 //  底层取块
-#define ARM_U1_LOW_POS      1.475f
-#define ARM_U2_LOW_POS      -0.415f
-#define ARM_DJ_LOW_POS      -220.0f
+#define ARM_U1_LOW_POS      1.643f
+#define ARM_U2_LOW_POS      -0.245f
+#define ARM_DJ_LOW_POS      -222.7f
 
 
 //底层放块
-#define ARM_U1_LOW1_POS      1.5f
-#define ARM_U2_LOW1_POS      -0.13f
-#define ARM_DJ_LOW1_POS      -232.0f
+#define ARM_U1_LOW1_POS      1.6f
+#define ARM_U2_LOW1_POS      0.55f
+#define ARM_DJ_LOW1_POS      -241.7f
 
 
 //  中层取块
-#define ARM_U1_MID_POS      0.88f
-#define ARM_U2_MID_POS      -0.23f
-#define ARM_DJ_MID_POS      -147.0f
+#define ARM_U1_MID_POS      1.31f
+#define ARM_U2_MID_POS      -0.02f
+#define ARM_DJ_MID_POS      -143.7f
 
 
 //中层放块
-#define ARM_U1_MID1_POS      0.93f
-#define ARM_U2_MID1_POS      -0.10f
-#define ARM_DJ_MID1_POS      -150.0f
+#define ARM_U1_MID1_POS      1.25f
+#define ARM_U2_MID1_POS      0.50f
+#define ARM_DJ_MID1_POS      -153.7f
 
 
 
 //  高层放块
-#define ARM_U1_HIGH_POS     1.2f
-#define ARM_U2_HIGH_POS     0.79f
-#define ARM_DJ_HIGH_POS     -184.0f
+#define ARM_U1_HIGH_POS     1.33f
+#define ARM_U2_HIGH_POS     1.18f
+#define ARM_DJ_HIGH_POS     -161.7f
 
 
 

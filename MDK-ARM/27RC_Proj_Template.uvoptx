@@ -230,6 +230,11 @@
           <WinNumber>1</WinNumber>
           <ItemText>Is_open</ItemText>
         </Ww>
+        <Ww>
+          <count>15</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>Is_keep</ItemText>
+        </Ww>
       </WatchWindow1>
       <MemoryWindow1>
         <Mm>
