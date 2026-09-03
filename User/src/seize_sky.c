@@ -25,13 +25,18 @@ volatile uint8_t Is_keep=0;
 volatile uint8_t Is_on=0;
 volatile uint8_t Is_open=0;
 volatile uint8_t Is_ok=0;
+volatile uint8_t Is_Sys_reset=0;
 ArmControl_t ArmControl;
 
 static uint8_t Is_enable=0;
 
 
 
-void Sys_res
+static void Sys_reset(void)
+{
+    __disable_irq();
+    NVIC_SystemReset();
+}
 
 void Relay_ON(void)
 {
@@ -495,6 +500,13 @@ void Arm_Control_Task(void *argument)
              ArmControl.last_state = ArmControl.state;
         }
 
+
+        if(Is_Sys_reset==1)
+        {
+            Sys_reset();
+            Is_Sys_reset=0;
+        }
+
         if(Is_open)
         {
             Relay_ON();
@@ -823,7 +835,23 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                            Is_pick = 0U;
                        }
 
-                       break;                  
+                       break;   
+                       
+                    //系统复位
+                    case 0x010202F0U:
+
+                       if (Rx_data[0] == 'R')
+                       {
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+                            Is_keep=0U;
+                           Is_pick = 0U;
+                           Is_Sys_reset=1U;
+                       }
+
+                       break; 
 
 
                    default:

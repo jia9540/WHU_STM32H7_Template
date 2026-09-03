@@ -88,6 +88,7 @@ extern volatile uint8_t Is_on;
 extern volatile uint8_t Is_open;
 extern volatile uint8_t Is_ok;
 extern volatile uint8_t Is_keep;
+extern volatile uint8_t Is_Sys_reset;
 
 
 typedef struct
