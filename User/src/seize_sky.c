@@ -633,6 +633,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        break;
 
+                    //启动开始，变为持块状态
                     case 0x010202FFU:
 
                        if (Rx_data[0] == 3)
@@ -703,6 +704,7 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                            Is_ready = 0U;
 
                            Is_reset = 1U;
+                           Is_open=0U;
                            
                        }
 
