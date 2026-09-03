@@ -21,6 +21,7 @@ volatile uint8_t Is_place=0;
 volatile uint8_t Is_store=0;
 volatile uint8_t Is_ready=0;
 volatile uint8_t Is_reset=0;
+volatile uint8_t Is_keep=0;
 volatile uint8_t Is_on=0;
 volatile uint8_t Is_open=0;
 volatile uint8_t Is_ok=0;
@@ -141,15 +142,15 @@ static void Arm_Interpolation_Update(void)
 
    
 
-    Unitree_motors[0].cmd.position =Target_Quintic_Interpolation(ArmControl.u1.start_angle,ArmControl.u1.target,ArmControl.time,ARM_MOVE_TIME);
-    Unitree_motors[1].cmd.position = Target_Quintic_Interpolation(ArmControl.u2.start_angle,ArmControl.u2.target,ArmControl.time,ARM_MOVE_TIME);
-    DJmotor[0].valSet.angle_deg =  Target_Quintic_Interpolation(ArmControl.dj.start_angle,ArmControl.dj.target,ArmControl.time,ARM_MOVE_TIME);
+    Unitree_motors[0].cmd.position =Target_Quintic_Interpolation(ArmControl.u1.start_angle,ArmControl.u1.target,ArmControl.time,ArmControl.total_time);
+    Unitree_motors[1].cmd.position = Target_Quintic_Interpolation(ArmControl.u2.start_angle,ArmControl.u2.target,ArmControl.time,ArmControl.total_time);
+    DJmotor[0].valSet.angle_deg =  Target_Quintic_Interpolation(ArmControl.dj.start_angle,ArmControl.dj.target,ArmControl.time,ArmControl.total_time);
 
     ArmControl.time += ARM_INTERPOLATION_DT;
 
-    if (ArmControl.time >= ARM_MOVE_TIME)
+    if (ArmControl.time >= ArmControl.total_time)
     {
-        ArmControl.time = ARM_MOVE_TIME;
+        ArmControl.time = ArmControl.total_time;
         Unitree_motors[0].cmd.position = ArmControl.u1.target;
         Unitree_motors[1].cmd.position = ArmControl.u2.target;
         DJmotor[0].valSet.angle_deg = ArmControl.dj.target;
@@ -262,15 +263,15 @@ static void Arm_SKY_Process(void)
     }
 }
 
-//储存状态
-static void Arm_STORT_Process(void)
-{
-    if (ArmControl.running == false &&
-        ArmControl.finish == false)
-    {
-        Arm_Interpolation_Start(ARM_U1_STORE_POS,ARM_U2_STORE_POS,ARM_DJ_STORE_POS,ARM_MOVE_TIME);
-    }
-}
+// //储存状态
+// static void Arm_STORT_Process(void)
+// {
+//     if (ArmControl.running == false &&
+//         ArmControl.finish == false)
+//     {
+//         Arm_Interpolation_Start(ARM_U1_STORE_POS,ARM_U2_STORE_POS,ARM_DJ_STORE_POS,ARM_MOVE_TIME);
+//     }
+// }
 
 //底层放块
 static void Arm_LOW1_Process(void)
@@ -299,7 +300,7 @@ static void Arm_HIGH_Process(void)
     if (ArmControl.running == false &&
         ArmControl.finish == false)
     {
-        Arm_Interpolation_Start(ARM_U1_HIGH_POS,ARM_U2_HIGH_POS,ARM_DJ_HIGH_POS,ARM_MOVE_TIME);
+        Arm_Interpolation_Start(ARM_U1_HIGH_POS,ARM_U2_HIGH_POS,ARM_DJ_HIGH_POS,ARM_MOVE_SKY_TIME);
     }
 }
 
@@ -349,6 +350,22 @@ void Arm_State_Update(void)
             Is_store=0;
             Is_reset=0;
             Is_ready=0;
+        return;
+    }
+
+        if (Is_keep)
+    {
+        if (ArmControl.state != ARM_STATE_KEEP)
+        {
+            ArmControl.state = ARM_STATE_KEEP;
+ 
+        }
+            Is_pick=0;
+            Is_place=0;
+            Is_store=0;
+            Is_reset=0;
+            Is_ready=0;
+            Is_keep=0;
         return;
     }
 
@@ -454,6 +471,7 @@ void Arm_State_Update(void)
     Is_store=0;
     Is_ready=0;
     Is_reset=0;
+    Is_keep=0;
 }
 
 
@@ -610,25 +628,23 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        else if (Rx_data[0] == 'D')
                        {
                         Is_on  =0;
+                        Is_open=0;
                        }
 
                        break;
 
+                    case 0x010202FFU:
 
-                   //取块准备（改）
-                   case 0x01020301U:
-
-                       if (Rx_data[0] == 'P')
+                       if (Rx_data[0] == 3)
                        {
-                           Is_pick  = 0U;
-                           Is_place = 0U;
-                           Is_store = 0U;
-                           Is_reset = 0U;
-
-                           Is_ready = 1U;
-                       }
+                        Is_keep=1;
+                       }                     
 
                        break;
+
+
+
+
 
                    //位置调节（改）
                    case 0x01020002U:
@@ -673,26 +689,13 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                 //        break;
 
 
-                   //放块开始（改）
-                   case 0x01020305U:
 
-                       if (Rx_data[0] == 'R')
-                       {
-                           Is_pick  = 0U;
-                           Is_store = 0U;
-                           Is_ready = 0U;
-                           Is_reset = 0U;
-
-                           Is_place = 1U;
-                       }
-
-                       break;
 
 
                    //返回零位（改）
                    case 0x01020200U:
 
-                       if (Rx_data[0] == 'Z')
+                       if (Rx_data[0] == 3)
                        {
                            Is_pick  = 0U;
                            Is_place = 0U;
@@ -700,9 +703,30 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                            Is_ready = 0U;
 
                            Is_reset = 1U;
+                           
                        }
 
                        break;
+
+
+
+                    //取块准备（改）
+                   case 0x01020301U:
+
+                       if (Rx_data[0] == 'P')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 1U;
+                           Is_store = 0U;
+                           Is_reset = 0U;
+
+                           Is_ready = 0U;
+                       }
+
+                       break;
+
+
+
 
                    //取块开始(改)
                    case 0x01020307U:
@@ -715,26 +739,10 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                            Is_reset = 0U;
 
                            Is_pick = 1U;
+                           Is_open=1U;
                        }
 
                        break;
-
-
-                   //放块准备（改）
-                   case 0x01020308U:
-
-                       if (Rx_data[0] == 'F')
-                       {
-                           Is_pick  = 0U;
-                           Is_place = 0U;
-                           Is_store = 0U;
-                           Is_reset = 0U;
-
-                           Is_ready = 1U;
-                       }
-
-                       break;
-
 
                     //取块完成（改）
                     case 0x01020309U:
@@ -743,13 +751,50 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 1U;
+                           Is_ready = 0U;
                            Is_reset = 0U;
+                           Is_keep =1U;
 
                            Is_pick = 0U;
                        }
 
                        break;
+
+
+
+                   //放块准备（改）
+                   case 0x01020308U:
+
+                       if (Rx_data[0] == 'F')
+                       {
+                           Is_pick  = 0U;
+                           Is_place = 1U;
+                           Is_store = 0U;
+                           Is_reset = 0U;
+
+                           Is_ready = 0U;
+                       }
+
+                       break;
+
+
+                    //放块开始（改）
+                   case 0x01020305U:
+
+                       if (Rx_data[0] == 'R')
+                       {
+                           Is_pick  = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+
+                           Is_place = 0U;
+                           Is_open=0U;
+                       }
+
+                       break;
+
+
 
                     //放块完成（改）
                     case 0x0102030AU:
@@ -758,9 +803,9 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 1U;
+                           Is_ready = 0U;
                            Is_reset = 0U;
-
+                            Is_keep=1U;
                            Is_pick = 0U;
                        }
 

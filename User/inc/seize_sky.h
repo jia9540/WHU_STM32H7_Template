@@ -21,9 +21,9 @@
 
 
 //  准备状态
-#define ARM_U1_READY_POS    0.64f
-#define ARM_U2_READY_POS    0.52f
-#define ARM_DJ_READY_POS    -240.0f
+#define ARM_U1_READY_POS    1.51f
+#define ARM_U2_READY_POS    -0.25f
+#define ARM_DJ_READY_POS    -225.0f
 // //  准备状态
 // #define ARM_U1_READY_POS    500.f
 // #define ARM_U2_READY_POS    400.f
@@ -31,50 +31,50 @@
 
 
 //  持块状态
-#define ARM_U1_KEEP_POS    0.64f
-#define ARM_U2_KEEP_POS    0.52f
-#define ARM_DJ_KEEP_POS    -240.0f
+#define ARM_U1_KEEP_POS    1.17f
+#define ARM_U2_KEEP_POS    0.22f
+#define ARM_DJ_KEEP_POS    -250.0f
 
 
-//  存贮状态
-#define ARM_U1_STORE_POS    0.64f
-#define ARM_U2_STORE_POS    0.52f
-#define ARM_DJ_STORE_POS    -240.0f
+// //  存贮状态
+// #define ARM_U1_STORE_POS    0.64f
+// #define ARM_U2_STORE_POS    0.52f
+// #define ARM_DJ_STORE_POS    -240.0f
 
 //取天空块
-#define ARM_U1_SKY_POS    0.672f
-#define ARM_U2_SKY_POS    -0.31f
-#define ARM_DJ_SKY_POS    -210.0f
+#define ARM_U1_SKY_POS    1.61f
+#define ARM_U2_SKY_POS    -0.79f
+#define ARM_DJ_SKY_POS    -205.0f
 
 //  底层取块
-#define ARM_U1_LOW_POS      0.64f
-#define ARM_U2_LOW_POS      0.38f
-#define ARM_DJ_LOW_POS      -230.0f
+#define ARM_U1_LOW_POS      1.475f
+#define ARM_U2_LOW_POS      -0.415f
+#define ARM_DJ_LOW_POS      -220.0f
 
 
 //底层放块
-#define ARM_U1_LOW1_POS      0.64f
-#define ARM_U2_LOW1_POS      0.52f
-#define ARM_DJ_LOW1_POS      -240.0f
+#define ARM_U1_LOW1_POS      1.5f
+#define ARM_U2_LOW1_POS      -0.13f
+#define ARM_DJ_LOW1_POS      -232.0f
 
 
 //  中层取块
-#define ARM_U1_MID_POS      0.64f
-#define ARM_U2_MID_POS      0.45f
-#define ARM_DJ_MID_POS      -140.0f
+#define ARM_U1_MID_POS      0.88f
+#define ARM_U2_MID_POS      -0.23f
+#define ARM_DJ_MID_POS      -147.0f
 
 
 //中层放块
-#define ARM_U1_MID1_POS      0.64f
-#define ARM_U2_MID1_POS      0.52f
-#define ARM_DJ_MID1_POS      -140.0f
+#define ARM_U1_MID1_POS      0.93f
+#define ARM_U2_MID1_POS      -0.10f
+#define ARM_DJ_MID1_POS      -150.0f
 
 
 
 //  高层放块
-#define ARM_U1_HIGH_POS     0.90f
-#define ARM_U2_HIGH_POS     1.50f
-#define ARM_DJ_HIGH_POS     -185.0f
+#define ARM_U1_HIGH_POS     1.2f
+#define ARM_U2_HIGH_POS     0.79f
+#define ARM_DJ_HIGH_POS     -184.0f
 
 
 
@@ -87,7 +87,7 @@ extern volatile uint8_t Is_reset;
 extern volatile uint8_t Is_on;
 extern volatile uint8_t Is_open;
 extern volatile uint8_t Is_ok;
-
+extern volatile uint8_t Is_keep;
 
 
 typedef struct
