@@ -23,7 +23,13 @@
 //  准备状态1
 #define ARM_U1_READY_POS    1.6f
 #define ARM_U2_READY_POS    0.35f
-#define ARM_DJ_READY_POS    -233.7f
+#define ARM_DJ_READY_POS    -233.0f
+
+//天空块准备阶段
+#define ARM_U1_SKY_READY_POS    1.643f
+#define ARM_U2_SKY_READY_POS    -0.15f
+#define ARM_DJ_SKY_READY_POS    -222.0f
+
 // //  准备状态
 // #define ARM_U1_READY_POS    500.f
 // #define ARM_U2_READY_POS    400.f
@@ -31,9 +37,9 @@
 
 
 //  持块状态1
-#define ARM_U1_KEEP_POS    1.6f
-#define ARM_U2_KEEP_POS    0.35f
-#define ARM_DJ_KEEP_POS    -233.7f
+#define ARM_U1_KEEP_POS    1.16f
+#define ARM_U2_KEEP_POS    0.72f
+#define ARM_DJ_KEEP_POS    -270.0f
 
 
 // //  存贮状态
@@ -43,13 +49,13 @@
 
 //取天空块
 #define ARM_U1_SKY_POS    1.71f
-#define ARM_U2_SKY_POS    -0.65f
-#define ARM_DJ_SKY_POS    -205.7f
+#define ARM_U2_SKY_POS    -0.5f
+#define ARM_DJ_SKY_POS    -205.0f
 
 //  底层取块
 #define ARM_U1_LOW_POS      1.643f
-#define ARM_U2_LOW_POS      -0.245f
-#define ARM_DJ_LOW_POS      -222.7f
+#define ARM_U2_LOW_POS      -0.15f
+#define ARM_DJ_LOW_POS      -222.0f
 
 
 //底层放块
@@ -66,7 +72,7 @@
 
 //中层放块
 #define ARM_U1_MID1_POS      1.25f
-#define ARM_U2_MID1_POS      0.50f
+#define ARM_U2_MID1_POS      0.60f
 #define ARM_DJ_MID1_POS      -153.7f
 
 
@@ -89,6 +95,7 @@ extern volatile uint8_t Is_open;
 extern volatile uint8_t Is_ok;
 extern volatile uint8_t Is_keep;
 extern volatile uint8_t Is_Sys_reset;
+extern volatile uint8_t Is_sky_ready;
 
 
 typedef struct
@@ -108,7 +115,7 @@ typedef enum
     ARM_STATE_MID,         // 中层取块状态 
     ARM_STATE_SKY,         // 取天空块
     ARM_STATE_KEEP,        //持块状态
-    ARM_STATE_STORT,       // 储存状态 
+    ARM_STATE_SKY_READY,   // 储存状态 
     ARM_STATE_LOW1,        //放一层
     ARM_STATE_MID1,        //放二层
     ARM_STATE_HIGH         //放三层

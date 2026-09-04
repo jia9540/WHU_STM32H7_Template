@@ -15,7 +15,7 @@
 #define ARM_START_ACCEL       4.6f
 
 
-volatile uint8_t level_flag=0;
+volatile uint8_t level_flag=1;
 volatile uint8_t Is_pick=0;
 volatile uint8_t Is_place=0;
 volatile uint8_t Is_store=0;
@@ -26,6 +26,7 @@ volatile uint8_t Is_on=0;
 volatile uint8_t Is_open=0;
 volatile uint8_t Is_ok=0;
 volatile uint8_t Is_Sys_reset=0;
+volatile uint8_t Is_sky_ready=0;
 ArmControl_t ArmControl;
 
 static uint8_t Is_enable=0;
@@ -231,6 +232,17 @@ static void Arm_Ready_Process(void)
     }
 }
 
+//天空块准备阶段
+static void Arm_sky_Ready_Process(void)
+{
+    if (ArmControl.running == false &&
+        ArmControl.finish == false)
+    {
+       Arm_Interpolation_Start(ARM_U1_SKY_READY_POS,ARM_U2_SKY_READY_POS,ARM_DJ_SKY_READY_POS,ARM_MOVE_TIME);
+    }
+}
+
+
 //起始状态
 static void Arm_NONE_Process(void)
 {
@@ -348,7 +360,14 @@ void Arm_State_Update(void)
 
     if (Is_ready)
     {
-        if (ArmControl.state != ARM_STATE_READY)
+        if(level_flag==0)
+        {
+            if (ArmControl.state != ARM_STATE_SKY_READY)
+            {
+            ArmControl.state = ARM_STATE_SKY_READY;
+            }
+        }
+        else if (ArmControl.state != ARM_STATE_READY)
         {
             ArmControl.state = ARM_STATE_READY;
  
@@ -379,19 +398,19 @@ void Arm_State_Update(void)
 
 
 
-    if (Is_store)
-    {
-        if (ArmControl.state != ARM_STATE_STORT)
-        {
-            ArmControl.state = ARM_STATE_STORT;
-        }
-        Is_pick=0;
-        Is_place=0;
-        Is_store=0;
-        Is_ready=0;
-        Is_reset=0;
-        return;
-    }
+    // if (Is_store)
+    // {
+    //     if (ArmControl.state != ARM_STATE_STORT)
+    //     {
+    //         ArmControl.state = ARM_STATE_STORT;
+    //     }
+    //     Is_pick=0;
+    //     Is_place=0;
+    //     Is_store=0;
+    //     Is_ready=0;
+    //     Is_reset=0;
+    //     return;
+    // }
 
 
     if (Is_pick==1&&Is_place==0)
@@ -493,12 +512,18 @@ void Arm_Control_Task(void *argument)
     for (;;)
     {
         osDelay(1);
+        // if (ArmControl.running==1)
+        // {
+        //     ArmControl.state=ArmControl.last_state;
+        // }
+
          if (ArmControl.state != ArmControl.last_state)
         {
              ArmControl.running = false;
             ArmControl.finish = false;
              ArmControl.last_state = ArmControl.state;
         }
+
 
 
         if(Is_Sys_reset==1)
@@ -524,6 +549,7 @@ void Arm_Control_Task(void *argument)
            Is_enable=1;
             }
         }
+
         else{
             if(Is_enable==1)
             {
@@ -547,10 +573,10 @@ void Arm_Control_Task(void *argument)
                 break;
 
 
-            // case ARM_STATE_STORT:
+            case ARM_STATE_SKY_READY:
 
-            //     Arm_STORT_Process();
-            //     break;
+                Arm_sky_Ready_Process();
+                break;
 
 
             case ARM_STATE_KEEP:
@@ -656,6 +682,36 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        break;
 
+                                           //系统复位
+                    case 0x010202F0U:
+
+                       if (Rx_data[0] == 'R')
+                       {
+                           Is_place = 0U;
+                           Is_store = 0U;
+                           Is_ready = 0U;
+                           Is_reset = 0U;
+                            Is_keep=0U;
+                           Is_pick = 0U;
+                           Is_Sys_reset=1U;
+                       }
+
+                       break; 
+
+
+                   default:
+
+                       break;
+                }
+
+
+
+                if(Is_on==1)
+                {
+               
+                 switch (Rxheader.Identifier)
+                    {
+
                     //启动开始，变为持块状态
                     case 0x010202FFU:
 
@@ -680,41 +736,6 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        }
 
                        break;
-
-
-                //    //存块
-                //    case 0x01020303U:
-
-                //        if (Rx_data[0] == 'S')
-                //        {
-                //            Is_pick  = 0U;
-                //            Is_place = 0U;
-                //            Is_ready = 0U;
-                //            Is_reset = 0U;
-
-                //            Is_store = 1U;
-                //        }
-
-                //        break;
-
-
-                //    //取存块
-                //    case 0x01020304U:
-
-                //        if (Rx_data[0] == 'G')
-                //        {
-                //            Is_place = 0U;
-                //            Is_store = 1U;
-                //            Is_ready = 0U;
-                //            Is_reset = 0U;
-
-                //            Is_pick = 0U;
-                //        }
-
-                //        break;
-
-
-
 
 
                    //返回零位（改）
@@ -742,11 +763,11 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        if (Rx_data[0] == 'P')
                        {
                            Is_pick  = 0U;
-                           Is_place = 1U;
+                           Is_place = 0U;
                            Is_store = 0U;
                            Is_reset = 0U;
 
-                           Is_ready = 0U;
+                           Is_ready = 1U;
                        }
 
                        break;
@@ -777,9 +798,9 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 1U;
+                           Is_ready = 0U;
                            Is_reset = 0U;
-                           Is_keep =0U;
+                           Is_keep =1U;
 
                            Is_pick = 0U;
                        }
@@ -829,34 +850,19 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
                        {
                            Is_place = 0U;
                            Is_store = 0U;
-                           Is_ready = 1U;
+                           Is_ready = 0U;
                            Is_reset = 0U;
-                            Is_keep=0U;
+                            Is_keep=1U;
                            Is_pick = 0U;
                        }
 
                        break;   
-                       
-                    //系统复位
-                    case 0x010202F0U:
 
-                       if (Rx_data[0] == 'R')
-                       {
-                           Is_place = 0U;
-                           Is_store = 0U;
-                           Is_ready = 0U;
-                           Is_reset = 0U;
-                            Is_keep=0U;
-                           Is_pick = 0U;
-                           Is_Sys_reset=1U;
-                       }
-
-                       break; 
-
-
-                   default:
+                    default:
 
                        break;
+                }     
+
                }
            }
 
