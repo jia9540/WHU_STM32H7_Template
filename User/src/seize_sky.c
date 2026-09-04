@@ -459,6 +459,11 @@ void Arm_State_Update(void)
 
         switch (level_flag)
         {
+            case 0:
+                new_state = ARM_STATE_SKY_READY;
+                break;
+   
+
             case 1:
                 new_state = ARM_STATE_LOW1;
                 break;
@@ -717,8 +722,8 @@ void Arm_Receive(FDCAN_RxHeaderTypeDef Rxheader, uint8_t *Rx_data)
 
                        if (Rx_data[0] == 3)
                        {
-                       // Is_keep=1;
-                       Is_ready=1;
+                       Is_keep=1;
+                       //Is_ready=1;
                        }                     
 
                        break;
